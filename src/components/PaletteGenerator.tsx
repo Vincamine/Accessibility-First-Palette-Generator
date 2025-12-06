@@ -7,6 +7,7 @@ import {
   getPalette,
 } from '@/lib/colorBrewerPalettes';
 import { getTextColor, getColorInfo } from '@/lib/colorUtils';
+import AIInput from './AIInput';
 
 interface PaletteGeneratorProps {
   onPaletteGenerated: (colors: string[]) => void;
@@ -53,6 +54,20 @@ export default function PaletteGenerator({
   return (
     <div className="bg-white rounded-lg shadow-lg p-6">
       <h2 className="text-xl font-bold mb-4 text-gray-800">Smart Palette Generation</h2>
+
+      {/* AI Palette Generation */}
+      <AIInput
+        dataType={paletteType}
+        colorCount={numColors}
+        onGenerate={onPaletteGenerated}
+      />
+
+      {/* Separator */}
+      <div className="my-6 border-t border-gray-300 pt-6">
+        <p className="text-sm text-gray-500 mb-4 text-center font-medium">
+          OR choose a pre-built palette:
+        </p>
+      </div>
 
       {/* Controls */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">

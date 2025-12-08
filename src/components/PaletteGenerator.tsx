@@ -11,12 +11,17 @@ import AIInput from './AIInput';
 
 interface PaletteGeneratorProps {
   onPaletteGenerated: (colors: string[]) => void;
+  onAIPaletteGenerated?: (
+    colors: string[],
+    metadata: { description: string; paletteName: string; dataType: 'categorical' | 'sequential' | 'diverging' }
+  ) => void;
   currentPalette: string[];
   onColorChange: (index: number, color: string) => void;
 }
 
 export default function PaletteGenerator({
   onPaletteGenerated,
+  onAIPaletteGenerated,
   currentPalette,
   onColorChange,
 }: PaletteGeneratorProps) {
@@ -60,6 +65,7 @@ export default function PaletteGenerator({
         dataType={paletteType}
         colorCount={numColors}
         onGenerate={onPaletteGenerated}
+        onAIGenerate={onAIPaletteGenerated}
       />
 
       {/* Separator */}

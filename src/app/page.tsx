@@ -4,12 +4,26 @@ import { useState } from 'react';
 import PaletteGenerator from '@/components/PaletteGenerator';
 import CVDSimulation from '@/components/CVDSimulation';
 import AccessibilityReport from '@/components/AccessibilityReport';
+import VisualPreview from '@/components/VisualPreview';
 
 export default function Home() {
   const [colors, setColors] = useState<string[]>([]);
+  const [paletteMetadata, setPaletteMetadata] = useState<{
+    description: string;
+    paletteName: string;
+    dataType: 'categorical' | 'sequential' | 'diverging';
+  } | null>(null);
 
   const handlePaletteGenerated = (newColors: string[]) => {
     setColors(newColors);
+  };
+
+  const handleAIPaletteGenerated = (
+    newColors: string[],
+    metadata: { description: string; paletteName: string; dataType: 'categorical' | 'sequential' | 'diverging' }
+  ) => {
+    setColors(newColors);
+    setPaletteMetadata(metadata);
   };
 
   const handleColorChange = (index: number, newColor: string) => {
@@ -39,17 +53,30 @@ export default function Home() {
           <section>
             <PaletteGenerator
               onPaletteGenerated={handlePaletteGenerated}
+              onAIPaletteGenerated={handleAIPaletteGenerated}
               currentPalette={colors}
               onColorChange={handleColorChange}
             />
           </section>
 
-          {/* Section 2: Vision Simulations */}
+          {/* Section 2: Visual Preview (AI-generated examples) */}
+          {paletteMetadata && colors.length > 0 && (
+            <section>
+              <VisualPreview
+                description={paletteMetadata.description}
+                colors={colors}
+                dataType={paletteMetadata.dataType}
+                paletteName={paletteMetadata.paletteName}
+              />
+            </section>
+          )}
+
+          {/* Section 3: Vision Simulations */}
           <section>
             <CVDSimulation colors={colors} />
           </section>
 
-          {/* Section 3: Accessibility Report */}
+          {/* Section 4: Accessibility Report */}
           <section>
             <AccessibilityReport colors={colors} />
           </section>

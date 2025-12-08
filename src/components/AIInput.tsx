@@ -6,6 +6,10 @@ interface AIInputProps {
   dataType: 'categorical' | 'sequential' | 'diverging';
   colorCount: number;
   onGenerate: (colors: string[]) => void;
+  onAIGenerate?: (
+    colors: string[],
+    metadata: { description: string; paletteName: string; dataType: 'categorical' | 'sequential' | 'diverging' }
+  ) => void;
 }
 
 interface AIResponse {
@@ -22,7 +26,7 @@ const EXAMPLE_PROMPTS = [
   'Environmental data showing climate change, serious and informative',
 ];
 
-export default function AIInput({ dataType, colorCount, onGenerate }: AIInputProps) {
+export default function AIInput({ dataType, colorCount, onGenerate, onAIGenerate }: AIInputProps) {
   const [description, setDescription] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -68,6 +72,15 @@ export default function AIInput({ dataType, colorCount, onGenerate }: AIInputPro
 
       // Trigger parent callback with colors
       onGenerate(data.colors);
+
+      // Also call AI-specific callback with metadata (if provided)
+      if (onAIGenerate) {
+        onAIGenerate(data.colors, {
+          description: description.trim(),
+          paletteName: data.name,
+          dataType,
+        });
+      }
 
     } catch (err) {
       console.error('Generation error:', err);

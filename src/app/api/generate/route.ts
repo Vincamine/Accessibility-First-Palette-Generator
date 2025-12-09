@@ -4,11 +4,26 @@ import { NextRequest, NextResponse } from 'next/server';
 // Initialize Gemini AI
 const genAI = new GoogleGenerativeAI(process.env.GOOGLE_GENERATIVE_AI_API_KEY || '');
 
+// Data characteristics from user's dataset
+interface DataCharacteristics {
+  numDataPoints: number;
+  numUniqueCategories?: number;
+  categoryNames?: string[];
+  valueRange?: [number, number];
+  mean?: number;
+  distribution?: 'uniform' | 'skewed' | 'bimodal' | 'normal';
+  trend?: 'increasing' | 'decreasing' | 'fluctuating' | 'stable';
+  hasOutliers: boolean;
+  recommendedType: 'categorical' | 'sequential' | 'diverging';
+  recommendedColorCount: number;
+}
+
 // Request body interface
 interface GenerateRequest {
   description: string;
   dataType: 'categorical' | 'sequential' | 'diverging';
   colorCount: number;
+  dataCharacteristics?: DataCharacteristics; // NEW: Optional for backward compatibility
 }
 
 // AI Response interface
@@ -23,7 +38,7 @@ export async function POST(request: NextRequest) {
   try {
     // Parse request body
     const body: GenerateRequest = await request.json();
-    const { description, dataType, colorCount } = body;
+    const { description, dataType, colorCount, dataCharacteristics } = body;
 
     // Validate input
     if (!description || description.trim().length < 10) {
@@ -63,7 +78,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Build prompt for Gemini
-    const prompt = buildPrompt(description, dataType, colorCount);
+    const prompt = buildPrompt(description, dataType, colorCount, dataCharacteristics);
 
     // Call Gemini 2.5 Flash (fast and cost-effective)
     const model = genAI.getGenerativeModel({ model: 'gemini-2.5-flash' });
@@ -125,12 +140,43 @@ export async function POST(request: NextRequest) {
 }
 
 // Build optimized prompt for Gemini
-function buildPrompt(description: string, dataType: string, colorCount: number): string {
+function buildPrompt(
+  description: string,
+  dataType: string,
+  colorCount: number,
+  dataCharacteristics?: DataCharacteristics
+): string {
   const dataTypeDescriptions = {
     categorical: 'distinct categories without inherent order (e.g., different products, categories)',
     sequential: 'ordered data from low to high values (e.g., temperature, population density)',
     diverging: 'data with a meaningful midpoint, showing deviation in two directions (e.g., profit/loss, temperature anomaly)',
   };
+
+  // Build data characteristics section if available
+  let dataSection = '';
+  if (dataCharacteristics) {
+    dataSection = `
+
+**ACTUAL USER DATA CHARACTERISTICS:**
+This is REAL data from the user's dataset. Use these insights to optimize the palette:
+
+- Number of data points: ${dataCharacteristics.numDataPoints}
+- Number of categories: ${dataCharacteristics.numUniqueCategories || 'N/A'}
+${dataCharacteristics.categoryNames ? `- Category names: ${dataCharacteristics.categoryNames.join(', ')}` : ''}
+${dataCharacteristics.valueRange ? `- Value range: ${dataCharacteristics.valueRange[0]} to ${dataCharacteristics.valueRange[1]}` : ''}
+${dataCharacteristics.mean !== undefined ? `- Mean value: ${dataCharacteristics.mean.toFixed(2)}` : ''}
+- Distribution: ${dataCharacteristics.distribution || 'unknown'}
+${dataCharacteristics.trend ? `- Trend: ${dataCharacteristics.trend}` : ''}
+- Has outliers: ${dataCharacteristics.hasOutliers ? 'Yes - consider using distinct color for outliers' : 'No'}
+- Recommended type: ${dataCharacteristics.recommendedType}
+
+**IMPORTANT OPTIMIZATION BASED ON DATA:**
+${generateDataDrivenGuidance(dataCharacteristics, dataType, colorCount)}`;
+  } else {
+    dataSection = `
+
+**NOTE:** No actual user data provided. Generate a generally applicable palette based on description and data type.`;
+  }
 
   return `You are an expert data visualization designer specializing in accessible color palettes.
 
@@ -141,6 +187,7 @@ Generate a color palette based on these requirements:
 **Data Type:** ${dataType} (${dataTypeDescriptions[dataType as keyof typeof dataTypeDescriptions]})
 
 **Number of Colors:** ${colorCount}
+${dataSection}
 
 **Accessibility Requirements:**
 1. All colors must be suitable for data visualization
@@ -160,7 +207,7 @@ Generate a color palette based on these requirements:
 {
   "colors": ["#hex1", "#hex2", "#hex3", ...],
   "name": "Descriptive Palette Name",
-  "description": "2-3 sentences explaining why these colors work for this specific context and how they create visual hierarchy or distinction",
+  "description": "2-3 sentences explaining why these colors work for this specific context and how they create visual hierarchy or distinction${dataCharacteristics ? ' based on the actual data characteristics' : ''}",
   "accessibility_notes": "1-2 sentences explaining how this palette ensures accessibility (CVD safety, Delta E values, contrast)"
 }
 
@@ -169,6 +216,77 @@ CRITICAL INSTRUCTIONS:
 - Ensure exactly ${colorCount} colors in the array
 - All colors must be in 6-digit lowercase hex format (e.g., #1f77b4)
 - Make colors contextually appropriate for: "${description}"
+${dataCharacteristics ? '- OPTIMIZE for the actual data characteristics provided above' : ''}
 
 Generate the palette now:`;
+}
+
+/**
+ * Generate data-driven guidance for AI
+ */
+function generateDataDrivenGuidance(
+  data: DataCharacteristics,
+  dataType: string,
+  colorCount: number
+): string {
+  const guidance: string[] = [];
+
+  // Check if color count matches data
+  if (data.numUniqueCategories && data.numUniqueCategories !== colorCount) {
+    guidance.push(
+      `⚠️ User requested ${colorCount} colors but data has ${data.numUniqueCategories} categories. Ensure colors can map to all categories.`
+    );
+  }
+
+  // Distribution-specific guidance
+  if (data.distribution === 'skewed' && dataType === 'sequential') {
+    guidance.push(
+      '• Distribution is skewed - consider using a non-linear color progression to better represent the data density.'
+    );
+  }
+
+  if (data.distribution === 'bimodal' && dataType !== 'diverging') {
+    guidance.push(
+      '• Distribution is bimodal - consider a diverging palette to highlight the two peaks.'
+    );
+  }
+
+  // Outlier guidance
+  if (data.hasOutliers) {
+    guidance.push(
+      '• Dataset has outliers - reserve the most distinct/vibrant color for outlier values.'
+    );
+  }
+
+  // Trend guidance
+  if (data.trend === 'increasing' && dataType === 'sequential') {
+    guidance.push(
+      '• Data shows increasing trend - use light-to-dark progression to reinforce the trend visually.'
+    );
+  }
+
+  if (data.trend === 'decreasing' && dataType === 'sequential') {
+    guidance.push(
+      '• Data shows decreasing trend - use dark-to-light progression to reinforce the trend visually.'
+    );
+  }
+
+  // Value range guidance
+  if (data.valueRange) {
+    const [min, max] = data.valueRange;
+    if (min < 0 && max > 0 && dataType !== 'diverging') {
+      guidance.push(
+        `• Data spans negative (${min}) to positive (${max}) - strongly recommend diverging palette with neutral midpoint at zero.`
+      );
+    }
+  }
+
+  // Category-specific guidance
+  if (data.categoryNames && data.categoryNames.length > 0) {
+    guidance.push(
+      `• Actual categories: ${data.categoryNames.slice(0, 5).join(', ')}${data.categoryNames.length > 5 ? '...' : ''} - Consider semantic color associations if applicable.`
+    );
+  }
+
+  return guidance.length > 0 ? guidance.join('\n') : 'Generate an optimal palette for this dataset.';
 }

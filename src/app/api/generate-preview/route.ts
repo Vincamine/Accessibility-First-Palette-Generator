@@ -4,12 +4,20 @@ import { NextRequest, NextResponse } from 'next/server';
 // Initialize Gemini AI
 const genAI = new GoogleGenerativeAI(process.env.GOOGLE_GENERATIVE_AI_API_KEY || '');
 
+// User's actual data point
+interface UserDataPoint {
+  label: string;
+  value: number;
+  category?: string;
+}
+
 // Request body interface
 interface GeneratePreviewRequest {
   description: string;
   colors: string[];
   dataType: 'categorical' | 'sequential' | 'diverging';
   paletteName: string;
+  userData?: UserDataPoint[]; // NEW: User's actual data (optional for backward compatibility)
 }
 
 // AI Response interface
@@ -30,37 +38,139 @@ export async function POST(request: NextRequest) {
   try {
     // Parse request body
     const body: GeneratePreviewRequest = await request.json();
-    const { description, colors, dataType, paletteName } = body;
+    const { description, colors, dataType, paletteName, userData } = body;
 
-    // Validate input
-    if (!description || description.trim().length < 10) {
-      return NextResponse.json(
-        { error: 'Description must be at least 10 characters' },
-        { status: 400 }
-      );
+    // NEW: If user provided actual data, use it directly!
+    if (userData && userData.length > 0) {
+      return handleUserData(userData, colors, dataType, description);
     }
 
-    if (!colors || !Array.isArray(colors) || colors.length < 3) {
-      return NextResponse.json(
-        { error: 'At least 3 colors are required' },
-        { status: 400 }
-      );
-    }
+    // FALLBACK: If no user data, generate mock data with AI (old behavior)
+    return handleAIGeneratedData(description, colors, dataType, paletteName);
+  } catch (error) {
+    console.error('Error in /api/generate-preview:', error);
+    return NextResponse.json(
+      { error: 'Failed to generate preview. Please try again.' },
+      { status: 500 }
+    );
+  }
+}
 
-    if (!['categorical', 'sequential', 'diverging'].includes(dataType)) {
-      return NextResponse.json(
-        { error: 'Invalid data type' },
-        { status: 400 }
-      );
-    }
+/**
+ * Handle user-provided actual data (NEW!)
+ */
+function handleUserData(
+  userData: UserDataPoint[],
+  colors: string[],
+  dataType: string,
+  description: string
+): NextResponse {
+  // Validate user data
+  if (userData.length > colors.length) {
+    // Too many data points - use only first N matching color count
+    userData = userData.slice(0, colors.length);
+  }
 
-    // Check API key
-    if (!process.env.GOOGLE_GENERATIVE_AI_API_KEY) {
-      return NextResponse.json(
-        { error: 'API key not configured' },
-        { status: 500 }
-      );
+  if (userData.length < colors.length) {
+    // Too few data points - pad with empty/zero values
+    while (userData.length < colors.length) {
+      userData.push({
+        label: `Point ${userData.length + 1}`,
+        value: 0,
+      });
     }
+  }
+
+  // Determine chart type based on data type and context
+  let chartType: 'bar' | 'line' | 'pie' | 'area' = 'bar';
+  const descLower = description.toLowerCase();
+
+  if (dataType === 'categorical') {
+    chartType = descLower.includes('distribution') || descLower.includes('proportion')
+      ? 'pie'
+      : 'bar';
+  } else if (dataType === 'sequential') {
+    chartType = descLower.includes('trend') || descLower.includes('over time')
+      ? 'line'
+      : descLower.includes('cumulative')
+        ? 'area'
+        : 'line';
+  } else {
+    chartType = 'bar';
+  }
+
+  // Generate appropriate labels
+  const title = generateTitleFromData(userData, dataType);
+  const xAxisLabel = dataType === 'sequential' ? 'Sequence' : 'Category';
+  const yAxisLabel = 'Value';
+
+  // Create response with ACTUAL user data
+  const previewData: PreviewResponse = {
+    chartType,
+    title,
+    xAxisLabel,
+    yAxisLabel,
+    data: userData.map(d => ({
+      label: d.label,
+      value: d.value,
+      category: d.category,
+    })),
+    description: `Visualization of your actual dataset with ${userData.length} data points using ${dataType} palette.`,
+  };
+
+  return NextResponse.json(previewData);
+}
+
+/**
+ * Generate title from actual data
+ */
+function generateTitleFromData(data: UserDataPoint[], dataType: string): string {
+  if (dataType === 'sequential') {
+    return `Trend: ${data[0]?.label} to ${data[data.length - 1]?.label}`;
+  }
+  return `Distribution across ${data.length} Categories`;
+}
+
+/**
+ * Handle AI-generated mock data (FALLBACK for backward compatibility)
+ */
+async function handleAIGeneratedData(
+  description: string,
+  colors: string[],
+  dataType: string,
+  paletteName: string
+): Promise<NextResponse> {
+  // Validate input
+  if (!description || description.trim().length < 10) {
+    return NextResponse.json(
+      { error: 'Description must be at least 10 characters' },
+      { status: 400 }
+    );
+  }
+
+  if (!colors || !Array.isArray(colors) || colors.length < 3) {
+    return NextResponse.json(
+      { error: 'At least 3 colors are required' },
+      { status: 400 }
+    );
+  }
+
+  if (!['categorical', 'sequential', 'diverging'].includes(dataType)) {
+    return NextResponse.json(
+      { error: 'Invalid data type' },
+      { status: 400 }
+    );
+  }
+
+  // Check API key
+  if (!process.env.GOOGLE_GENERATIVE_AI_API_KEY) {
+    return NextResponse.json(
+      { error: 'API key not configured' },
+      { status: 500 }
+    );
+  }
+
+  try {
 
     // Build prompt for Gemini
     const prompt = buildPreviewPrompt(description, colors, dataType, paletteName);

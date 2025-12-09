@@ -1,6 +1,7 @@
 'use client';
 
 import { useState } from 'react';
+import { UserDataSet } from '@/lib/dataAnalysis';
 
 interface AIInputProps {
   dataType: 'categorical' | 'sequential' | 'diverging';
@@ -10,6 +11,7 @@ interface AIInputProps {
     colors: string[],
     metadata: { description: string; paletteName: string; dataType: 'categorical' | 'sequential' | 'diverging' }
   ) => void;
+  userData: UserDataSet | null;
 }
 
 interface AIResponse {
@@ -26,7 +28,7 @@ const EXAMPLE_PROMPTS = [
   'Environmental data showing climate change, serious and informative',
 ];
 
-export default function AIInput({ dataType, colorCount, onGenerate, onAIGenerate }: AIInputProps) {
+export default function AIInput({ dataType, colorCount, onGenerate, onAIGenerate, userData }: AIInputProps) {
   const [description, setDescription] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -58,6 +60,7 @@ export default function AIInput({ dataType, colorCount, onGenerate, onAIGenerate
           description: description.trim(),
           dataType,
           colorCount,
+          dataCharacteristics: userData?.characteristics, // NEW: Pass actual data characteristics!
         }),
       });
 
@@ -103,6 +106,8 @@ export default function AIInput({ dataType, colorCount, onGenerate, onAIGenerate
   };
 
   const isValid = description.trim().length >= 10 && description.length <= 500;
+  const hasData = userData !== null;
+  const canGenerate = isValid && hasData;
 
   return (
     <div className="bg-gradient-to-br from-blue-50 to-indigo-50 rounded-lg border-2 border-blue-200 p-6 mb-6">
@@ -113,7 +118,7 @@ export default function AIInput({ dataType, colorCount, onGenerate, onAIGenerate
             AI Palette Generation
           </h3>
           <p className="text-sm text-gray-600">
-            Describe your visualization needs and let AI generate an accessible palette for you
+            Describe your visualization needs and AI will generate a palette based on your data
           </p>
         </div>
       </div>
@@ -172,11 +177,11 @@ export default function AIInput({ dataType, colorCount, onGenerate, onAIGenerate
       {/* Generate Button */}
       <button
         onClick={handleGenerate}
-        disabled={!isValid || loading}
+        disabled={!canGenerate || loading}
         className={`w-full py-3 px-4 rounded-md font-medium transition-all ${
           loading
             ? 'bg-blue-400 cursor-wait'
-            : isValid
+            : canGenerate
             ? 'bg-blue-600 hover:bg-blue-700 text-white'
             : 'bg-gray-300 text-gray-500 cursor-not-allowed'
         }`}
@@ -234,13 +239,11 @@ export default function AIInput({ dataType, colorCount, onGenerate, onAIGenerate
         </div>
       )}
 
-      {/* Instructions */}
-      {!aiResponse && !loading && (
-        <div className="mt-4 p-3 bg-blue-50 rounded-md border border-blue-200">
-          <p className="text-xs text-blue-800">
-            <strong>How it works:</strong> AI will analyze your description and generate a palette that matches your
-            context (industry, mood, audience) while ensuring accessibility. The selected data type ({dataType}) and
-            number of colors ({colorCount}) above will guide the generation.
+      {/* Data Info */}
+      {!aiResponse && !loading && hasData && userData && (
+        <div className="mt-4 p-3 bg-green-50 rounded-md border border-green-200">
+          <p className="text-xs text-green-700">
+            ✓ Using your data: {userData.characteristics.numDataPoints} points, {userData.characteristics.numUniqueCategories} categories
           </p>
         </div>
       )}

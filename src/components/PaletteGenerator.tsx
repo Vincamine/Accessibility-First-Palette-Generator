@@ -7,6 +7,7 @@ import {
   getPalette,
 } from '@/lib/colorBrewerPalettes';
 import { getTextColor, getColorInfo } from '@/lib/colorUtils';
+import { UserDataSet } from '@/lib/dataAnalysis';
 import AIInput from './AIInput';
 
 interface PaletteGeneratorProps {
@@ -17,6 +18,7 @@ interface PaletteGeneratorProps {
   ) => void;
   currentPalette: string[];
   onColorChange: (index: number, color: string) => void;
+  userData: UserDataSet | null;
 }
 
 export default function PaletteGenerator({
@@ -24,6 +26,7 @@ export default function PaletteGenerator({
   onAIPaletteGenerated,
   currentPalette,
   onColorChange,
+  userData,
 }: PaletteGeneratorProps) {
   const [paletteType, setPaletteType] = useState<PaletteType>('categorical');
   const [numColors, setNumColors] = useState<number>(5);
@@ -66,6 +69,7 @@ export default function PaletteGenerator({
         colorCount={numColors}
         onGenerate={onPaletteGenerated}
         onAIGenerate={onAIPaletteGenerated}
+        userData={userData}
       />
 
       {/* Separator */}

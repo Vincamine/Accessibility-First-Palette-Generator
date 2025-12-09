@@ -5,6 +5,8 @@ import PaletteGenerator from '@/components/PaletteGenerator';
 import CVDSimulation from '@/components/CVDSimulation';
 import AccessibilityReport from '@/components/AccessibilityReport';
 import VisualPreview from '@/components/VisualPreview';
+import DataUploader from '@/components/DataUploader';
+import { UserDataSet } from '@/lib/dataAnalysis';
 
 export default function Home() {
   const [colors, setColors] = useState<string[]>([]);
@@ -13,6 +15,7 @@ export default function Home() {
     paletteName: string;
     dataType: 'categorical' | 'sequential' | 'diverging';
   } | null>(null);
+  const [userData, setUserData] = useState<UserDataSet | null>(null);
 
   const handlePaletteGenerated = (newColors: string[]) => {
     setColors(newColors);
@@ -32,6 +35,10 @@ export default function Home() {
     setColors(updatedColors);
   };
 
+  const handleDataLoaded = (dataset: UserDataSet) => {
+    setUserData(dataset);
+  };
+
   return (
     <main className="min-h-screen bg-gray-100">
       {/* Header */}
@@ -49,6 +56,14 @@ export default function Home() {
       {/* Main Content */}
       <div className="max-w-7xl mx-auto px-4 py-8">
         <div className="space-y-8">
+          {/* Section 0: Data Upload (NEW!) */}
+          <section>
+            <DataUploader
+              onDataLoaded={handleDataLoaded}
+              currentDataset={userData}
+            />
+          </section>
+
           {/* Section 1: Palette Generator */}
           <section>
             <PaletteGenerator
@@ -56,6 +71,7 @@ export default function Home() {
               onAIPaletteGenerated={handleAIPaletteGenerated}
               currentPalette={colors}
               onColorChange={handleColorChange}
+              userData={userData}
             />
           </section>
 
@@ -67,6 +83,7 @@ export default function Home() {
                 colors={colors}
                 dataType={paletteMetadata.dataType}
                 paletteName={paletteMetadata.paletteName}
+                userData={userData}
               />
             </section>
           )}

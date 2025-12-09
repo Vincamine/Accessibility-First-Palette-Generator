@@ -2,6 +2,7 @@
 
 import { useState } from 'react';
 import { simulatePaletteCVD, CVDType, analyzePalettePairs } from '@/lib/colorUtils';
+import { UserDataSet } from '@/lib/dataAnalysis';
 import BarChart from './charts/BarChart';
 import LineChart from './charts/LineChart';
 import PieChart from './charts/PieChart';
@@ -12,6 +13,7 @@ interface VisualPreviewProps {
   colors: string[];
   dataType: 'categorical' | 'sequential' | 'diverging';
   paletteName: string;
+  userData: UserDataSet | null;
 }
 
 interface PreviewData {
@@ -60,6 +62,7 @@ export default function VisualPreview({
   colors,
   dataType,
   paletteName,
+  userData,
 }: VisualPreviewProps) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -80,6 +83,7 @@ export default function VisualPreview({
           colors,
           dataType,
           paletteName,
+          userData: userData?.raw, // NEW: Pass actual user data!
         }),
       });
 
